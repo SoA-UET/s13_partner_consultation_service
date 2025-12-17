@@ -1,5 +1,28 @@
 from bson import ObjectId
 from datetime import datetime
+from pymongo import MongoClient
+import os
+
+# MongoDB connection
+_mongo_client = None
+_mongo_db = None
+
+def get_mongo_client():
+    """Get or create MongoDB client"""
+    global _mongo_client
+    if _mongo_client is None:
+        mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+        _mongo_client = MongoClient(mongo_uri)
+    return _mongo_client
+
+def get_mongo_db():
+    """Get MongoDB database"""
+    global _mongo_db
+    if _mongo_db is None:
+        client = get_mongo_client()
+        db_name = os.getenv("MONGODB_DB_NAME", "telcenter_partner")
+        _mongo_db = client[db_name]
+    return _mongo_db
 
 def serialize_mongo_doc(doc):
     """Convert MongoDB document to JSON serializable format"""
