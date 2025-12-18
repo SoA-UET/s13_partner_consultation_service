@@ -248,9 +248,13 @@ Key configuration items:
 
 ## Known Limitations and TODOs
 
-1. **JWT Authentication**: Currently placeholder implementation
-   - Full JWT verification according to VERIFY.md needs to be implemented
-   - JWKS fetching and caching not yet implemented
+1. **JWT Authentication**: ✅ **IMPLEMENTED**
+   - Full JWT verification according to VERIFY.md has been implemented
+   - JWKS fetching and caching with TTL-based refresh
+   - RS256 signature verification
+   - Strict claim validation (exp, iat, sub, full_name, email, permissions)
+   - DoS prevention (no refresh on verification failure)
+   - Applied to all HTTP REST endpoints
 
 2. **Request ID Mapping**: 
    - consultation_request request IDs should be cached/mapped

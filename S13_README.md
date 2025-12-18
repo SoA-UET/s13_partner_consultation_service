@@ -55,6 +55,11 @@ cp .env.example .env
   - `A10B_REQUESTS_QUEUE`: Queue for sending requests to Core
   - `A10B_RESPONSES_QUEUE`: Queue for receiving responses from Core
 
+- **JWT Authentication:**
+  - `IDENTITY_SERVICE_URL`: Base URL of Identity Service (for JWKS fetching)
+  - `JWKS_TTL_IN_MINUTES`: JWKS cache TTL in minutes (default: 10)
+  - `JWT_CLOCK_SKEW_SECONDS`: Allowed clock skew for time-based claims (default: 60)
+
 ## Running the Service
 
 ### Development Mode
@@ -88,13 +93,15 @@ uv run -m app
 
 ### APIs Implemented
 
-#### HTTP REST API (H31)
-- `GET /api/v1/conversations` - List all conversations
-- `GET /api/v1/conversations/{id}` - Get conversation details
-- `GET /api/v1/conversations/{id}/messages` - Get message history
-- `POST /api/v1/conversations/{id}/messages` - Send a message
+#### HTTP REST API (H31) - JWT Authentication Required
+- `GET /api/v1/conversations` - List all conversations (requires JWT)
+- `GET /api/v1/conversations/{id}` - Get conversation details (requires JWT)
+- `GET /api/v1/conversations/{id}/messages` - Get message history (requires JWT)
+- `POST /api/v1/conversations/{id}/messages` - Send a message (requires JWT)
 
-#### Socket.IO (H31)
+All HTTP REST endpoints require JWT authentication via `Authorization: Bearer <token>` header.
+
+#### Socket.IO (H31) - No Authentication Required
 - `consultation_request` - New consultation request notification
 - `consultation_response` - Accept/reject consultation
 - `new_message` - Real-time text messages
@@ -178,7 +185,12 @@ rabbitmqctl list_queues name messages_ready messages_unacknowledged
 - MessageQueueService handles thread-safe operations
 
 ### JWT Authentication
-- JWT authentication is planned but not fully implemented
+- ✅ JWT authentication is fully implemented according to VERIFY.md specification
+- All HTTP REST endpoints require valid JWT tokens
+- Socket.IO endpoints do not require authentication
+- See [JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md) for usage
+- See [JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md) for technical details
+- Test with: `python test_jwt_auth.py <your-jwt-token>`
 - The `require_auth` decorator is a placeholder
 - Full implementation should follow the VERIFY.md specification
 
