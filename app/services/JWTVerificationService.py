@@ -122,6 +122,9 @@ class JWTVerificationService:
         """
         Fetch JWKS from Identity Service.
         
+        According to VERIFY.md, the response should be an array of key objects.
+        Each key object must contain: kid, kty, alg, public_key, use
+        
         Returns:
             True if fetch was successful, False otherwise
         """
@@ -132,37 +135,58 @@ class JWTVerificationService:
             
             jwks_data = response.json()
             
-            # Validate response format
-            if not isinstance(jwks_data, dict):
-                logger.error(f"Invalid JWKS format: expected dict, got {type(jwks_data)}")
+            # Validate response format - must be an array
+            if not isinstance(jwks_data, list):
+                logger.error(f"Invalid JWKS format: expected array/list, got {type(jwks_data)}")
                 return False
             
-            # Validate required fields
+            if not jwks_data:
+                logger.error("Invalid JWKS format: array is empty")
+                return False
+            
+            # Process and validate each key in the array
+            valid_keys: Dict[str, Dict[str, Any]] = {}
             required_fields = ['kid', 'kty', 'alg', 'public_key', 'use']
-            for field in required_fields:
-                if field not in jwks_data:
-                    logger.error(f"Invalid JWKS format: missing required field '{field}'")
+            
+            for idx, jwk in enumerate(jwks_data):
+                # Validate that each element is a dict
+                if not isinstance(jwk, dict):
+                    logger.error(f"Invalid JWKS format: element {idx} is not a dict, got {type(jwk)}")
                     return False
+                
+                # Validate required fields
+                for field in required_fields:
+                    if field not in jwk:
+                        logger.error(f"Invalid JWKS format: element {idx} missing required field '{field}'")
+                        return False
+                
+                # Validate values
+                if jwk['kty'] != 'RSA':
+                    logger.error(f"Invalid key {idx}: unsupported key type '{jwk['kty']}' (only RSA is supported)")
+                    return False
+                
+                if jwk['alg'] != 'RS256':
+                    logger.error(f"Invalid key {idx}: unsupported algorithm '{jwk['alg']}' (only RS256 is supported)")
+                    return False
+                
+                if jwk['use'] != 'sig':
+                    logger.error(f"Invalid key {idx}: invalid key use '{jwk['use']}' (must be 'sig')")
+                    return False
+                
+                # Store the valid key
+                valid_keys[jwk['kid']] = jwk
             
-            # Validate values
-            if jwks_data['kty'] != 'RSA':
-                logger.error(f"Unsupported key type: {jwks_data['kty']} (only RSA is supported)")
+            if not valid_keys:
+                logger.error("No valid keys found in JWKS response")
                 return False
             
-            if jwks_data['alg'] != 'RS256':
-                logger.error(f"Unsupported algorithm: {jwks_data['alg']} (only RS256 is supported)")
-                return False
-            
-            if jwks_data['use'] != 'sig':
-                logger.error(f"Invalid key use: {jwks_data['use']} (must be 'sig')")
-                return False
-            
-            # Update cache
+            # Update cache atomically
             with self._cache_lock:
-                self._jwks_cache[jwks_data['kid']] = jwks_data
+                self._jwks_cache.clear()
+                self._jwks_cache.update(valid_keys)
                 self._jwks_last_fetch = time.time()
             
-            logger.info(f"JWKS fetched successfully - kid: {jwks_data['kid']}")
+            logger.info(f"JWKS fetched successfully - loaded {len(valid_keys)} key(s): {list(valid_keys.keys())}")
             return True
             
         except requests.exceptions.RequestException as e:
